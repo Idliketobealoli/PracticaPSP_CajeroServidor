@@ -7,6 +7,7 @@ import model.User
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.Socket
+import kotlin.random.Random
 
 class ClientManager(socket: Socket) : Thread() {
     val client = socket
@@ -14,22 +15,28 @@ class ClientManager(socket: Socket) : Thread() {
     var exit = false
 
     override fun run() {
-        if(checkIfUserExists()) {
-            DataOutputStream(client.getOutputStream()).writeUTF("User accepted, login successful.")
-            DataOutputStream(client.getOutputStream()).writeInt(1)
-            writeInLog(3,"")
-            while (!exit) {
-                when (DataInputStream(client.getInputStream()).readInt()) {
-                    1 -> withdraw()
-                    2 -> balance()
-                    3 -> deposit()
-                    4 -> logOut()
+        val mode = DataInputStream(client.getInputStream()).readInt()
+        if(mode == 1) {
+            if(checkIfUserExists()) {
+                DataOutputStream(client.getOutputStream()).writeUTF("User accepted, login successful.")
+                DataOutputStream(client.getOutputStream()).writeInt(1)
+                writeInLog(3,"")
+                while (!exit) {
+                    when (DataInputStream(client.getInputStream()).readInt()) {
+                        1 -> withdraw()
+                        2 -> balance()
+                        3 -> deposit()
+                        4 -> logOut()
+                    }
                 }
+            } else {
+                writeInLog(5,"Incorrect email or password.")
+                DataOutputStream(client.getOutputStream()).writeUTF("Incorrect email or password.")
+                DataOutputStream(client.getOutputStream()).writeInt(0)
+                client.close()
             }
         } else {
-            writeInLog(5,"Incorrect email or password.")
-            DataOutputStream(client.getOutputStream()).writeUTF("Incorrect email or password.")
-            DataOutputStream(client.getOutputStream()).writeInt(0)
+            createNewUser()
             client.close()
         }
     }
@@ -43,7 +50,11 @@ class ClientManager(socket: Socket) : Thread() {
 
     private fun deposit() {
         val cash = DataInputStream(client.getInputStream()).readDouble()
-        ListUsers.users.first { x -> x.email == mail }.saldo += cash
+        val userBalance = ListUsers.users.first { x -> x.email == mail }.saldo
+        val newBalance = userBalance + cash
+        ListUsers.users.first { x -> x.email == mail }.saldo = newBalance
+        ListUsers.modifyBalance(mail, newBalance)
+
         writeInLog(2, "Added $cash €")
         DataOutputStream(client.getOutputStream()).writeUTF("Added $cash € to your balance.")
     }
@@ -56,10 +67,12 @@ class ClientManager(socket: Socket) : Thread() {
 
     private fun withdraw() {
         val cash = DataInputStream(client.getInputStream()).readDouble()
-        val userSaldo = ListUsers.users.first { x -> x.email == mail }.saldo
+        val userBalance = ListUsers.users.first { x -> x.email == mail }.saldo
         val userLimit = ListUsers.users.first { x -> x.email == mail }.limitSaldo
-        if (cash <= userSaldo && cash <= userLimit) {
-            ListUsers.users.first { x -> x.email == mail }.saldo -= cash
+        if (cash <= userBalance && cash <= userLimit) {
+            val newBalance = userBalance - cash
+            ListUsers.users.first { x -> x.email == mail }.saldo = newBalance
+            ListUsers.modifyBalance(mail, newBalance)
             writeInLog(0, "Withdrawed $cash €")
             DataOutputStream(client.getOutputStream()).writeUTF("Withdrawed $cash € from your balance.")
         } else {
@@ -76,6 +89,7 @@ class ClientManager(socket: Socket) : Thread() {
             3 -> Logger.printLogMessage(Log.LOG_IN, "Logged into account: $mail")
             4 -> Logger.printLogMessage(Log.LOG_OUT, "Logged out of account: $mail")
             5 -> Logger.printLogMessage(Log.ERROR, "Error detected : $s")
+            6 -> Logger.printLogMessage(Log.LOG_IN, "Account created: $mail")
         }
     }
 
@@ -89,5 +103,26 @@ class ClientManager(socket: Socket) : Thread() {
             mail = users.first().email
         }
         return users.isNotEmpty()
+    }
+
+    private fun createNewUser() {
+        val email = DataInputStream(client.getInputStream()).readUTF()
+        val name = DataInputStream(client.getInputStream()).readUTF()
+        val password = DataInputStream(client.getInputStream()).readUTF()
+        val users = ListUsers.users.filter { x -> x.email == email }
+        if (users.isNotEmpty()) { DataOutputStream(client.getOutputStream()).writeUTF(
+            "ERROR: this email already exists. Please use a different one."
+        )
+            writeInLog(5, "This email already exists: $email")
+        }
+        else {
+            val user = User(name,email,password, Random.nextDouble(10000.0,100000.0), Random.nextDouble(1000.0,10000.0))
+            ListUsers.addUser(user)
+            mail = email
+            writeInLog(6, "")
+            DataOutputStream(client.getOutputStream()).writeUTF(
+                "Account created successfully. Please log in with your account now."
+            )
+        }
     }
 }
