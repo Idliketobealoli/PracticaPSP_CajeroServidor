@@ -20,14 +20,16 @@ object ListUsers {
         val lines: List<String>? = Files.readAllLines(path)
         val userList: ArrayList<User> = ArrayList<User>()
         lines?.forEach {
-            val st = StringTokenizer(it,",")
-            val user = User()
-            user.name = st.nextToken()
-            user.email = st.nextToken()
-            user.password = st.nextToken()
-            user.saldo = parseDouble(st.nextToken())
-            user.limitSaldo = parseDouble(st.nextToken())
-            userList.add(user)
+            if (it.isNotEmpty()) {
+                val st = StringTokenizer(it,",")
+                val user = User()
+                user.name = st.nextToken()
+                user.email = st.nextToken()
+                user.password = st.nextToken()
+                user.saldo = parseDouble(st.nextToken())
+                user.limitSaldo = parseDouble(st.nextToken())
+                userList.add(user)
+            }
         }
         return userList
     }
@@ -49,37 +51,16 @@ object ListUsers {
         val path: Path = Paths.get("${System.getProperty("user.dir")}${File.separator}src" +
                 "${File.separator}main${File.separator}resources${File.separator}users.csv")
         val file = File(path.toUri())
-        val lines: ArrayList<String>? = Files.readAllLines(path) as ArrayList<String>?
-        var lineToModify = ""
 
-        lines?.forEach {
-            val st = StringTokenizer(it, ",")
-            st.nextToken()
-            val emailFromCSV = st.nextToken()
-            if (email == emailFromCSV) {
-                lineToModify = it
+        val writer = BufferedWriter(FileWriter(file, false))
+        writer.write("")
+        users.forEach {
+            writer.append("${it.name},${it.email},${it.password},${it.saldo},${it.limitSaldo}")
+            if(it != users.last()) {
+                writer.append("\n")
             }
         }
-
-        if(lineToModify != "") {
-            lines?.remove(lineToModify)
-        }
-
-
-        val stokenizer = StringTokenizer(lineToModify,",")
-        val modifiedUser = User()
-        modifiedUser.name = stokenizer.nextToken()
-        modifiedUser.email = stokenizer.nextToken()
-        modifiedUser.password = stokenizer.nextToken()
-        stokenizer.nextToken()
-        modifiedUser.saldo = newBalance
-        modifiedUser.limitSaldo = parseDouble(stokenizer.nextToken())
-        val added = users.add(modifiedUser)
-        if (added) {
-            val writer = BufferedWriter(FileWriter(file, true))
-            writer.append("\n${modifiedUser.name},${modifiedUser.email},${modifiedUser.password},${modifiedUser.saldo},${modifiedUser.limitSaldo}")
-            writer.flush()
-            writer.close()
-        }
+        writer.flush()
+        writer.close()
     }
 }

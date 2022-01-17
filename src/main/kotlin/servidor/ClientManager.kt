@@ -51,12 +51,16 @@ class ClientManager(socket: Socket) : Thread() {
     private fun deposit() {
         val cash = DataInputStream(client.getInputStream()).readDouble()
         val userBalance = ListUsers.users.first { x -> x.email == mail }.saldo
-        val newBalance = userBalance + cash
-        ListUsers.users.first { x -> x.email == mail }.saldo = newBalance
-        ListUsers.modifyBalance(mail, newBalance)
-
-        writeInLog(2, "Added $cash €")
-        DataOutputStream(client.getOutputStream()).writeUTF("Added $cash € to your balance.")
+        if (cash >= 0.0) {
+            val newBalance = userBalance + cash
+            ListUsers.users.first { x -> x.email == mail }.saldo = newBalance
+            ListUsers.modifyBalance(mail, newBalance)
+            writeInLog(2, "Added $cash €")
+            DataOutputStream(client.getOutputStream()).writeUTF("Added $cash € to your balance.")
+        } else {
+            writeInLog(5, "Zero or negative value not allowed.")
+            DataOutputStream(client.getOutputStream()).writeUTF("Zero or negative values are not allowed.")
+        }
     }
 
     private fun balance() {
